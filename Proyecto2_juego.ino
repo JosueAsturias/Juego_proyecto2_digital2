@@ -6,6 +6,7 @@
  * IE3027: Electrónica Digital 2 - 2019
  * Proyecto 2 IE3027
  * Josue Asturias y Miguel Garcia
+ * Videojuego Dragon Ball Z en pantalla 320x240
  */
 //***************************************************************************************************************************************
 #include <stdint.h>
@@ -23,41 +24,74 @@
 #include "driverlib/timer.h"
 #include <SPI.h>
 #include <SD.h>
+//#include <Wire.h>
 
 
-#include "bitmaps.h"
+//#include "bitmaps.h"
 #include "font.h"
 #include "lcd_registers.h"
 
+/* Botones para el Jugador 1*/
 #define PUSH_UP PE_2
 #define PUSH_LEFT PE_3
-#define PUSH_RIGHT PA_6
-#define PUSH_DOWN PA_7
+#define PUSH_RIGHT PF_4
+#define PUSH_DOWN PF_0
 #define PUSH_A PC_4
 #define PUSH_B PC_5
 
+/* Botones para el Jugador 2 */
+#define PUSH2_UP PC_7
+#define PUSH2_LEFT PF_3
+#define PUSH2_RIGHT PF_1
+#define PUSH2_DOWN PC_6
+#define PUSH2_A PE_4
+#define PUSH2_B PE_5  
+
+// Pines que van a la LCD
 #define LCD_RST PD_6 //PD_0 PB6
 #define LCD_CS PD_7  //PD_1 PB7
 #define LCD_RS PD_2
 #define LCD_WR PD_3
 #define LCD_RD PE_1
 int DPINS[] = {PB_0, PB_1, PB_2, PB_3, PB_4, PB_5, PB_6, PB_7};  
+
+extern uint8_t cricosoNuevo[];
+extern uint8_t suelo1[];
+extern char * dir_ataqueA[];
+extern char * dir_ataqueB[];
+
+struct jugador{
+  uint8_t seleccion;
+  uint8_t py;
+  uint16_t px;
+  uint8_t pos_spr;
+  uint8_t orientacion;
+  uint8_t vida;
+  uint8_t ki;
+  uint8_t listo;
+};
+
+struct poder{
+  uint8_t tecnica;
+  uint8_t py;
+  uint16_t px;
+  uint8_t spr;
+  uint8_t damage;
+  uint8_t gasto;
+  unsigned long zeit;
+  
+};
+
 unsigned char player1[12540] = {};
 unsigned char player2[12540] = {};
-uint8_t P1_select = 1;
-uint8_t P2_select = 4;
 
-uint8_t P1_y = 159;
-uint16_t P1_x = 100;
-uint8_t P1_pos = 0;
-uint8_t P1_or = 0;
-uint8_t P1_vida = 100;
 
-uint8_t P2_y = 159;
-uint16_t P2_x = 180;
-uint8_t P2_pos = 0;
-uint8_t P2_or = 1;
-uint8_t P2_vida = 100;
+jugador P1 = {1,159,100,0,0,100,100,0};
+jugador P2 = {4,159,180,0,1,100,100,0};
+
+poder AtaqueP1 = {0,100,100,0,0,0,0};
+poder AtaqueP2 = {0,100,100,0,0,0,0};
+
 //***************************************************************************************************************************************
 // Functions Prototypes
 //***************************************************************************************************************************************
@@ -76,6 +110,8 @@ void LCD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int
 void LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[],int columns, int index, char flip, char offset);
 
 void Anim_golpe(unsigned char personaje_golpe[], uint16_t pos_x, uint16_t pos_y,bool orientacion);
+
+void reset_Estados(void);
 //***************************************************************************************************************************************
 // Inicialización
 //***************************************************************************************************************************************
@@ -88,23 +124,21 @@ void setup() {
   pinMode(PUSH_RIGHT, INPUT_PULLUP);
   pinMode(PUSH_DOWN, INPUT_PULLUP);
 
-  pinMode(PF_1, INPUT_PULLUP);
+  pinMode(PUSH2_A,INPUT_PULLUP);
+  pinMode(PUSH2_B,INPUT_PULLUP);
+  pinMode(PUSH2_UP, INPUT_PULLUP);
+  pinMode(PUSH2_LEFT, INPUT_PULLUP);
+  pinMode(PUSH2_RIGHT, INPUT_PULLUP);
+  pinMode(PUSH2_DOWN, INPUT_PULLUP);
   
   SysCtlClockSet(SYSCTL_SYSDIV_2_5|SYSCTL_USE_PLL|SYSCTL_OSC_MAIN|SYSCTL_XTAL_16MHZ);
-  //Serial.begin(9600);
-  Serial3.begin(9600);
+  Serial.begin(9600);
+  //Wire.begin();
   SPI.setModule(0);
   GPIOPadConfigSet(GPIO_PORTB_BASE, 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7, GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPU);
   LCD_Init();
   LCD_Clear(0x00);
   LCD_Clear(0x865e);
-
-  //Serial.print("Initializing SD card...");
-  // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
-  // Note that even if it's not used as the CS pin, the hardware SS pin
-  // (10 on most Arduino boards, 53 on the Mega) must be left as an output
-  // or the SD library functions will not work.
-  //pinMode(10, OUTPUT);
 
   if (!SD.begin(32)) {
     //Serial.println("initialization failed!");
@@ -112,153 +146,312 @@ void setup() {
   }
   //Serial.println("initialization done.");
 
-  //LCD_SD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char * direccion)
-  uint16_t x_crico = 20;
-  uint8_t y_crico = 70;
-  LCD_SD_Bitmap(x_crico,y_crico,40,50,"inicio.txt");
-  LCD_SD_Bitmap(x_crico,y_crico + 50,40,50,"inicio2.txt");
-  LCD_SD_Bitmap(x_crico+40,y_crico,40,50,"inicio3.txt");
-  LCD_SD_Bitmap(x_crico+40,y_crico + 50,40,50,"inicio4.txt");
-  LCD_SD_Bitmap(x_crico+80,y_crico,40,50,"inicio5.txt");
-  LCD_SD_Bitmap(x_crico+80,y_crico + 50,40,50,"inicio6.txt");
-  LCD_SD_Bitmap(x_crico+120,y_crico,40,50,"inicio7.txt");
-  LCD_SD_Bitmap(x_crico+120,y_crico + 50,40,50,"inicio8.txt");
-  LCD_SD_Bitmap(x_crico+160,y_crico,40,50,"inicio9.txt");
-  LCD_SD_Bitmap(x_crico+160,y_crico + 50,40,50,"inicio10.txt");
-  LCD_SD_Bitmap(x_crico+200,y_crico,40,50,"inicio11.txt");
-  LCD_SD_Bitmap(x_crico+200,y_crico + 50,40,50,"inicio12.txt");
-  LCD_SD_Bitmap(x_crico+240,y_crico,40,50,"inicio13.txt");
-  LCD_SD_Bitmap(x_crico+240,y_crico + 50,40,50,"inicio14.txt");
-  delay(5000);
+  //LCD_Bitmap(0,0,320,240,cricosoNuevo);
+  //delay(5000);
+
+  
 }
-//LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[],int columns, int index, char flip, char offset);
 //***************************************************************************************************************************************
-// Loop Infinito
+// Loop Infinito       Loop Infinito    Loop Infinito      Loop Infinito      Loop Infinito     Loop Infinito     Loop Infinito   Loop Infinito                                                          
 //***************************************************************************************************************************************
 void loop() {
   if (pantallas == 0){
-    FillRect(0, 0, 319, 239, 0xAA23);
-    Per_avatar(P1_select,70,100,40,56);
+    LCD_Clear(0xAA23);
+    Per_avatar(P1.seleccion,70,100,40,56);
+    String jug1 = " P1 ";
+    LCD_Print(jug1,57,78,2,0xFFFF, 0xA8A3);
     LCD_SD_Sprite(50,120,18,22,2,0,0,0,"flechas.txt");
     LCD_SD_Sprite(112,120,18,22,2,0,1,0,"flechas.txt");
-    Per_avatar(P2_select,200,100,40,56);
+    Per_avatar(P2.seleccion,200,100,40,56);
+    String jug2 = " P2 ";
+    LCD_Print(jug2,187,78,2,0xFFFF, 0x1A0B);
     LCD_SD_Sprite(180,120,18,22,2,0,0,0,"flechas.txt");
     LCD_SD_Sprite(242,120,18,22,2,0,1,0,"flechas.txt");
   }
   
   while(pantallas == 0){
-    Serial3.write(170);
-    if(digitalRead(PUSH_RIGHT) == 0){
+
+    //seleccion jugador 1:------------------------------------------------------------------------------------------------------------------
+    if(digitalRead(PUSH_RIGHT) == 0 && P1.listo == 0){
       LCD_SD_Sprite(112,120,18,22,2,1,1,0,"flechas.txt");
-      P1_select ++;
-      if (P1_select >= 6){
-        P1_select = 1;
+      P1.seleccion ++;
+      if (P1.seleccion >= 6){
+        P1.seleccion = 1;
       }
-      Per_avatar(P1_select,70,100,40,56);
+      Per_avatar(P1.seleccion,70,100,40,56);
     }
     else{
       LCD_SD_Sprite(112,120,18,22,2,0,1,0,"flechas.txt");
      // LCD_SD_Sprite(int x, int y, int width, int height,int columns, int index, char flip, char offset,char * direccion){
     }
 
-    if(digitalRead(PUSH_LEFT) == 0){
+    if(digitalRead(PUSH_LEFT) == 0 && P1.listo == 0){
       LCD_SD_Sprite(50,120,18,22,2,1,0,0,"flechas.txt");
-      P1_select --;
-      if (P1_select < 1){
-        P1_select = 5;
+      P1.seleccion --;
+      if (P1.seleccion < 1){
+        P1.seleccion = 5;
       }
-      Per_avatar(P1_select,70,100,40,56);
+      Per_avatar(P1.seleccion,70,100,40,56);
     }
     else{
       LCD_SD_Sprite(50,120,18,22,2,0,0,0,"flechas.txt");
      // LCD_SD_Sprite(int x, int y, int width, int height,int columns, int index, char flip, char offset,char * direccion){
     }
 
-    if(digitalRead(PUSH_A) == 0){
+    if(digitalRead(PUSH_A) == 0 && P1.listo == 0){
+      P1.listo = 1;
+      //void LCD_Print(String text, int x, int y, int fontSize, int color, int background) 
+      String letrero = "Listo!";
+      LCD_Print(letrero,43,170,2,0xFFFF,0xA8A3);
+    }
+    
+    if(digitalRead(PUSH_B) == 0 && P1.listo == 1){
+      P1.listo = 0;
+      FillRect(43, 170, 95, 16, 0xAA23);
+    }
+
+    //seleccion jugador 2:------------------------------------------------------------------------------------------------------------
+    if(digitalRead(PUSH2_RIGHT) == 0 && P2.listo == 0){
+      LCD_SD_Sprite(242,120,18,22,2,1,1,0,"flechas.txt");
+      P2.seleccion ++;
+      if (P2.seleccion >= 6){
+        P2.seleccion = 1;
+      }
+      Per_avatar(P2.seleccion,200,100,40,56);
+    }
+    else{
+      LCD_SD_Sprite(242,120,18,22,2,0,1,0,"flechas.txt");
+     // LCD_SD_Sprite(int x, int y, int width, int height,int columns, int index, char flip, char offset,char * direccion){
+    }
+
+    if(digitalRead(PUSH2_LEFT) == 0 && P2.listo == 0){
+      LCD_SD_Sprite(180,120,18,22,2,1,0,0,"flechas.txt");
+      P2.seleccion --;
+      if (P2.seleccion < 1){
+        P2.seleccion = 5;
+      }
+      Per_avatar(P2.seleccion,200,100,40,56);
+    }
+    else{
+      LCD_SD_Sprite(180,120,18,22,2,0,0,0,"flechas.txt");
+     // LCD_SD_Sprite(int x, int y, int width, int height,int columns, int index, char flip, char offset,char * direccion){
+    }
+
+    if(digitalRead(PUSH2_A) == 0 && P2.listo == 0){
+      P2.listo = 1;
+      String letrero = "Listo!";
+      LCD_Print(letrero,173,170,2,0xFFFF,0xA8A3);
+    }
+    
+    if(digitalRead(PUSH2_B) == 0 && P2.listo == 1){
+      P2.listo = 0;
+      FillRect(173, 170, 95, 16, 0xAA23);
+    }
+      
+      
+      
+      
+    if(P1.listo && P2.listo){  
       pantallas = 1;
       LCD_Clear(0x763e);
-      Per_avatar(P1_select,2,2,40,56);
-      Per_avatar(P2_select,277,2,40,56);
+      for(uint8_t n = 0; n<16; n++){
+        LCD_Bitmap(n*20,219,20,20,suelo1);
+      }
+      Per_avatar(P1.seleccion,2,2,40,56);
+      Per_avatar(P2.seleccion,277,2,40,56);
       char * sprite_dir[] = {"xxSpr.txt", "GoSpr.txt","FreSpr.txt","VegSpr.txt", "CeSpr.txt", "BuSpr.txt"};
-      SD_loadP1_Sprite(sprite_dir[P1_select]);
-      SD_loadP2_Sprite(sprite_dir[P2_select]);
+      SD_loadP1_Sprite(sprite_dir[P1.seleccion]);
+      SD_loadP2_Sprite(sprite_dir[P2.seleccion]);
 
+      reset_Estados();
       FillRect(45,10,100,20,0x4bc4);
-      FillRect(277-105,10,100,20,0x4bc4);
+      FillRect(172,10,100,20,0x4bc4); // x = 277-105
 
-      P2_vida = 100;
-      P1_vida = 100;
+      FillRect(45,32,P1.ki,10,0x1A0B);
+      FillRect(172+P2.ki,32,P2.ki,10,0x1A0B);
+
+      
+
+    }
+  }
+
+  unsigned long currentMillis = millis();
+  if( (currentMillis-AtaqueP1.zeit) >= 300){
+    AtaqueP1.zeit = 0;
+  }
+  
+  LCD_Sprite(P1.px,P1.py,33,38,player1,5,P1.pos_spr,P1.orientacion,0);
+  H_line(P1.px,P1.py-1,34,0x763e);
+  H_line(P1.px,P1.py + 39, 34, 0x763e);
+  V_line(P1.px-1,P1.py,39, 0x763e);
+  V_line(P1.px+34,P1.py,39, 0x763e);
+
+  LCD_Sprite(P2.px,P2.py,33,38,player2,5,P2.pos_spr,P2.orientacion,0);
+  H_line(P2.px,P2.py-1,34,0x763e);
+  H_line(P2.px,P2.py + 39, 34, 0x763e);
+  V_line(P2.px-1,P2.py,39, 0x763e);
+  V_line(P2.px+34,P2.py,39, 0x763e);
+
+  if(AtaqueP1.tecnica != 0){
+    switch(AtaqueP1.tecnica){
+      case 1:
+        if( !(((AtaqueP1.px+13) >= P2.px) && (AtaqueP1.px <= (P2.px+33)) && ((AtaqueP1.py+13)>=P2.py) && (AtaqueP1.py <= (P2.py+38)) ) ){
+          FillRect(AtaqueP1.px, AtaqueP1.py, 17,13,0x763e);
+          switch (P1.orientacion){
+            case 0:
+              AtaqueP1.px +=17;
+              break;
+            case 1:
+              AtaqueP1.px -=17;
+              break;
+          }
+          if( !(AtaqueP1.px > 320  || AtaqueP1.px<=20) ){
+            LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,dir_ataqueA[P1.seleccion]);
+          }
+          else{
+            AtaqueP1.tecnica = 0;
+            AtaqueP1.zeit = ATK_limpiar(P1.orientacion, P1.px, 2, AtaqueP1.py, 17,13);
+          }
+        }
+        else{
+          AtaqueP1.tecnica = 0;
+          AtaqueP1.zeit = ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
+          P2.vida -= AtaqueP1.damage;
+          FillRect(172,10,(100-P2.vida),20,0x763e);
+          if (P2.vida == 0){
+            pantallas = 0;
+          }
+        }
+        
+        break;
+      //case 2:
+    }
+    //LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,"GoPW1.txt");
+  }
+
+  
+ // Controles Jugador 1-------------------------------------------------------------------------- 
+  if (digitalRead(PUSH_RIGHT) == 0 && !AtaqueP1.tecnica){
+    P1.orientacion = 0;
+    P1.pos_spr = 1;
+    if( !(((P1.px+33)>=P2.px) && (P1.px<(P2.px+33)) && (P1.py<(P2.py+38)) && ((P1.py+38)>P2.py))){
+      P1.px +=1;
+      if (P1.px > 285){
+        P1.px = 285;
+      }
+    }
+  }
+
+  if (digitalRead(PUSH_LEFT) == 0 && !AtaqueP1.tecnica){
+    P1.orientacion = 1;
+    P1.pos_spr = 1;
+    if( !((P1.px<=(P2.px+33)) && (P1.px>=P2.px) && (P1.py<(P2.py+38)) && ((P1.py+38)>P2.py) ) ){
+      P1.px --;
+      if(P1.px < 2){
+        P1.px = 2;
+      }
     }
   }
   
-  LCD_Sprite(P1_x,P1_y,33,38,player1,5,P1_pos,P1_or,0);
-  H_line(P1_x,P1_y-1,34,0x763e);
-  H_line(P1_x,P1_y + 39, 34, 0x763e);
-  V_line(P1_x-1,P1_y,39, 0x763e);
-  V_line(P1_x+34,P1_y,39, 0x763e);
-
-  LCD_Sprite(P2_x,P2_y,33,38,player2,5,P2_pos,P2_or,0);
-  H_line(P2_x,P2_y-1,34,0x763e);
-  H_line(P2_x,P2_y + 39, 34, 0x763e);
-  V_line(P2_x-1,P2_y,39, 0x763e);
-  V_line(P2_x+34,P2_y,39, 0x763e);
+   if (digitalRead(PUSH_DOWN) == 0 && digitalRead(PUSH_B) && !AtaqueP1.tecnica ){
+    if (P1.py != 179){
+      P1.pos_spr = 1;
+    }
+    else{
+      P1.pos_spr = 0;
+    }
+    if( !(((P1.py+38)>=P2.py) && (P1.py<(P2.py)) && ((P1.px+33)>P2.px) && (P1.px<(P2.px+33)) )){
+      P1.py ++;
+      if (P1.py > 179){
+        P1.py = 179;
+      }
+    }
+  }
   
-  if (digitalRead(PUSH_RIGHT) == 0){
-    P1_or = 0;
-    P1_pos = 1;
-    P1_x +=1;
-    if (P1_x > 285){
-      P1_x = 285;
+  if (digitalRead(PUSH_UP) == 0 && !AtaqueP1.tecnica) {
+    P1.pos_spr = 1;
+    if( !((P1.py<=(P2.py+38)) && (P1.py>P2.py) && ((P1.px+33)>P2.px) && (P1.px<(P2.px+33))) ){
+      P1.py --;
+      if (P1.py < 65){
+        P1.py = 65;
+      }
     }
   }
-
-  if (digitalRead(PUSH_LEFT) == 0){
-    P1_or = 1;
-    P1_pos = 1;
-    P1_x --;
-    if(P1_x < 2){
-      P1_x = 2;
-    }
-  }
-   if (digitalRead(PUSH_DOWN) == 0){
-    P1_pos = 0;
-    P1_y ++;
-    if (P1_y > 180){
-      P1_y = 180;
-    }
-  }
-  if (digitalRead(PUSH_UP) == 0){
-    P1_pos = 1;
-    P1_y --;
-    if (P1_y < 65){
-      P1_y = 65;
-    }
-  }
+  
     if (digitalRead(PUSH_A) == 0){
-    P1_pos = 3;
-    if(P1_or == 0){
-      LCD_SD_Sprite(P1_x+35,P1_y+13,17,13,3,0,P1_or,0,"GoPW1.txt");
-    }
-    else if (P1_or == 1){
-      LCD_SD_Sprite(P1_x-18,P1_y+13,17,13,3,0,P1_or,0,"GoPW1.txt");
-    }
-      //LCD_SD_Sprite(int x, int y, int width, int height,int columns, int index, char flip, char offset,char * direccion)
-    P2_vida --;
-    FillRect(172,10,(100-P2_vida),20,0x763e);
-    
-    if (P2_vida == 0){
+      P1.pos_spr = 3;
+      if (P1.ki >= 10 && !AtaqueP1.zeit ){
+        if(AtaqueP1.tecnica == 0){
+            ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
+            AtaqueP1.py = P1.py + 13;
+            AtaqueP1.damage = 5;
+            AtaqueP1.spr = 0;
+            AtaqueP1.gasto = 10;
+            P1.ki -= 10;
+            FillRect(46+P1.ki,32,100-P1.ki,10,0x763e);
+            switch(P1.orientacion){
+              case 0:
+                AtaqueP1.px = P1.px + 35;
+                LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,dir_ataqueA[P1.seleccion]);
+                AtaqueP1.px +=17;
+                AtaqueP1.tecnica = 1;
+                AtaqueP1.spr = 1;
+                break;
+              case 1:
+                if(P1.px<35){
+                  AtaqueP1.tecnica = 0;
+                  AtaqueP1.zeit = millis();
+                }
+                else{
+                  AtaqueP1.px = P1.px - 17;
+                  LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,dir_ataqueA[P1.seleccion]);
+                  AtaqueP1.px -=17;
+                  AtaqueP1.tecnica = 1;
+                  AtaqueP1.spr = 1;
+                }
+                
+                break;
+            }
+        }
+       }
+     }
+     else{
+      if(AtaqueP1.spr == 1 && AtaqueP1.tecnica == 1){
+        AtaqueP1.zeit = ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
+        AtaqueP1.tecnica = 0;
+      }
+     }
+
+   if (digitalRead(PUSH_B) == 0 && digitalRead(PUSH_DOWN)){
+    P1.pos_spr = 4;
+    //P1.vida --;
+    //(45 + P1.vida,10,100-P1.vida,20,0x763e);
+    if (P1.vida == 0){
       pantallas = 0;
     }
   }
 
-   if (digitalRead(PUSH_B) == 0){
-    P1_pos = 4;
-    P1_vida --;
-    FillRect(45 + P1_vida,10,100-P1_vida,20,0x763e);
-    if (P1_vida == 0){
-      pantallas = 0;
+  if( !digitalRead(PUSH_B) && !digitalRead(PUSH_DOWN)){
+    P1.pos_spr = 2;
+    if(P1.ki <101){
+      P1.ki ++;
+      //FillRect(45,32,P1.ki,10,0x1A0B);
+      V_line(45+P1.ki,32,9, 0x1A0B);
     }
+    
+    
   }
+
+    if (digitalRead(PUSH_UP) == 1 &&
+        digitalRead(PUSH_DOWN) == 1 &&
+        digitalRead(PUSH_RIGHT) == 1 &&
+        digitalRead(PUSH_LEFT) == 1 &&
+        digitalRead(PUSH_A) == 1 &&
+        digitalRead(PUSH_B) == 1){
+
+     P1.pos_spr = 0;    
+     AtaqueP1.tecnica = 0;
+    }
 
 
   
@@ -759,9 +952,51 @@ void SD_loadP2_Sprite(char * direccion){
   }
 }
 
+//***************************************************************************************************************************************
+// Función para cargar cuadro con avatar de cada personaje para cada jugador
+//***************************************************************************************************************************************
 void Per_avatar(uint8_t player_select,uint16_t x, uint8_t y, uint8_t ancho, uint8_t alto){
   char * dir[] = {"xxPe.txt", "GoPe.txt","FrePe.txt","VegPe.txt", "CePe.txt", "BuPe.txt"};
   LCD_SD_Bitmap(x,y,ancho,alto,dir[player_select]);
 }
 
-//void lim_Player(
+//***************************************************************************************************************************************
+// Función para cargar estado iniciales al terminar partida
+//***************************************************************************************************************************************
+void reset_Estados(void){
+  P1.py = 179;
+  P1.px = 100;
+  P1.pos_spr = 0;
+  P1.orientacion = 0;
+  P1.vida = 100;
+  P1.ki = 50;
+  P1.listo = 0;
+  AtaqueP1.zeit = 0;
+
+  P2.py = 120;
+  P2.px = 3;
+  P2.pos_spr = 0;
+  P2.orientacion = 1;
+  P2.vida = 100;
+  P2.ki = 50;
+  P2.listo = 0;
+  AtaqueP2.zeit = 0;
+}
+
+//***************************************************************************************************************************************
+// Función para limpiar rastro de ataque
+//***************************************************************************************************************************************
+unsigned long ATK_limpiar(uint8_t orientacion, uint16_t x, uint16_t ATKx, uint8_t ATKy,uint8_t dimX, uint8_t dimY){
+  switch(orientacion){
+    case 0:
+      FillRect(x+35,ATKy,dimX, dimY, 0x763e);
+      FillRect(ATKx, ATKy, dimX,dimY,0x763e);
+      break;
+    case 1:
+      FillRect(x - dimX,ATKy,dimX, dimY, 0x763e);
+      FillRect(ATKx, ATKy, dimX,dimY,0x763e);
+      break;
+  }
+  unsigned long tiempo = millis(); 
+  return(tiempo); 
+}
