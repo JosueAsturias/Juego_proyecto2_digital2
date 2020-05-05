@@ -58,7 +58,9 @@ int DPINS[] = {PB_0, PB_1, PB_2, PB_3, PB_4, PB_5, PB_6, PB_7};
 extern uint8_t cricosoNuevo[];
 extern uint8_t suelo1[];
 extern char * dir_ataqueA[];
-extern char * dir_ataqueB[];
+extern char * dir_ataqueB1[];
+extern char * dir_ataqueB2[];
+extern uint8_t KO[];
 
 struct jugador{
   uint8_t seleccion;
@@ -109,9 +111,15 @@ void LCD_Print(String text, int x, int y, int fontSize, int color, int backgroun
 void LCD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned char bitmap[]);
 void LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[],int columns, int index, char flip, char offset);
 
-void Anim_golpe(unsigned char personaje_golpe[], uint16_t pos_x, uint16_t pos_y,bool orientacion);
-
+//void Anim_golpe(unsigned char personaje_golpe[], uint16_t pos_x, uint16_t pos_y,bool orientacion);
+void LCD_SD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int height, char * direccion);
+void LCD_SD_Sprite(int x, int y, int width, int height,int columns, int index, char flip, char offset,char * direccion);
+void SD_loadP1_Sprite(char * direccion);
+void SD_loadP2_Sprite(char * direccion);
+void Per_avatar(uint8_t player_select,uint16_t x, uint8_t y, uint8_t ancho, uint8_t alto);
 void reset_Estados(void);
+unsigned long ATK_limpiar(uint8_t orientacion, uint16_t x, uint16_t ATKx, uint8_t ATKy,uint8_t dimX, uint8_t dimY);
+
 //***************************************************************************************************************************************
 // Inicialización
 //***************************************************************************************************************************************
@@ -147,7 +155,7 @@ void setup() {
   //Serial.println("initialization done.");
 
   //LCD_Bitmap(0,0,320,240,cricosoNuevo);
-  //delay(5000);
+  //delay(4000);
 
   
 }
@@ -247,10 +255,7 @@ void loop() {
       P2.listo = 0;
       FillRect(173, 170, 95, 16, 0xAA23);
     }
-      
-      
-      
-      
+ 
     if(P1.listo && P2.listo){  
       pantallas = 1;
       LCD_Clear(0x763e);
@@ -270,14 +275,22 @@ void loop() {
       FillRect(45,32,P1.ki,10,0x1A0B);
       FillRect(172+P2.ki,32,P2.ki,10,0x1A0B);
 
-      
-
+//      LCD_Bitmap(125,100,69,44,KO);
+//      String gana1 = "P1 WINS!";
+//      LCD_Print(gana1, 95,75,2,0xFFFF,0xA8A3);
     }
   }
 
+  /* *****************************************************************************************
+   *                                         Pelea
+   *******************************************************************************************/
+
   unsigned long currentMillis = millis();
-  if( (currentMillis-AtaqueP1.zeit) >= 300){
+  if( (currentMillis-AtaqueP1.zeit) >= 500){
     AtaqueP1.zeit = 0;
+  }
+  if( (currentMillis-AtaqueP2.zeit) >= 500){
+    AtaqueP2.zeit = 0;
   }
   
   LCD_Sprite(P1.px,P1.py,33,38,player1,5,P1.pos_spr,P1.orientacion,0);
@@ -292,6 +305,7 @@ void loop() {
   V_line(P2.px-1,P2.py,39, 0x763e);
   V_line(P2.px+34,P2.py,39, 0x763e);
 
+// ATAQUE JUGADOR 1
   if(AtaqueP1.tecnica != 0){
     switch(AtaqueP1.tecnica){
       case 1:
@@ -320,13 +334,147 @@ void loop() {
           FillRect(172,10,(100-P2.vida),20,0x763e);
           if (P2.vida == 0){
             pantallas = 0;
+            GAME_OVER(1);
           }
         }
         
         break;
-      //case 2:
+      case 2:
+        if( !(((AtaqueP1.px+52)>=P2.px) && (AtaqueP1.px <= (P2.px+33)) && ((AtaqueP1.py+30) >= P2.py) && (AtaqueP1.py <= (P2.py+38))) ){
+          switch(P1.orientacion){
+            case 0:
+              AtaqueP1.px +=5;
+              break;
+            case 1:
+              AtaqueP1.px -=5;
+              break;
+          }
+          if( !(AtaqueP1.px > 267 ||  AtaqueP1.px <=15) ){ //agregar topa con ataque contrario
+            LCD_SD_Sprite(AtaqueP1.px, AtaqueP1.py,52,30,1,0,P1.orientacion,0, dir_ataqueB2[P1.seleccion]);
+          }
+          else{
+            AtaqueP1.zeit = millis();
+            switch(P1.orientacion){
+              case 0:
+                FillRect(P1.px+33,P1.py,(AtaqueP1.px + 52)-(P1.px+33),38,0x763e);
+                break;
+              case 1:
+                FillRect(AtaqueP1.px,P1.py,P1.px-AtaqueP1.px,38,0x763e);
+                break;
+            }
+          }
+        }
+        else{
+          AtaqueP1.tecnica = 0;
+          if (P2.vida > AtaqueP1.damage){
+            P2.vida -= AtaqueP1.damage;
+            FillRect(172,10,(100-P2.vida),20,0x763e);
+          }
+          else{
+            P2.vida = 0;
+          }
+          AtaqueP1.zeit = millis();
+          switch(P1.orientacion){
+            case 0:
+              FillRect(P1.px+33,P1.py,(AtaqueP1.px + 52)-(P1.px+33),38,0x763e);
+              break;
+            case 1:
+              FillRect(AtaqueP1.px,P1.py,P1.px-AtaqueP1.px,38,0x763e);
+              break;
+          }
+          if(!P2.vida){
+            pantallas = 0;
+            GAME_OVER(1);
+          }
+        }
     }
-    //LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,"GoPW1.txt");
+  }
+
+ // ATAQUE JUGADOR 2
+
+ if(AtaqueP2.tecnica != 0){
+    switch(AtaqueP2.tecnica){
+      case 1:
+        if( !(((AtaqueP2.px+13) >= P1.px) && (AtaqueP2.px <= (P1.px+33)) && ((AtaqueP2.py+13)>=P1.py) && (AtaqueP2.py <= (P1.py+38)) ) ){
+          FillRect(AtaqueP2.px, AtaqueP2.py, 17,13,0x763e);
+          switch (P2.orientacion){
+            case 0:
+              AtaqueP2.px +=17;
+              break;
+            case 1:
+              AtaqueP2.px -=17;
+              break;
+          }
+          if( !(AtaqueP2.px > 320  || AtaqueP2.px<=20) ){
+            LCD_SD_Sprite(AtaqueP2.px,AtaqueP2.py,17,13,2,AtaqueP2.spr,P2.orientacion,0,dir_ataqueA[P2.seleccion]);
+          }
+          else{
+            AtaqueP2.tecnica = 0;
+            AtaqueP2.zeit = ATK_limpiar(P2.orientacion, P2.px, 2, AtaqueP2.py, 17,13);
+          }
+        }
+        else{
+          AtaqueP2.tecnica = 0;
+          AtaqueP2.zeit = ATK_limpiar(P2.orientacion, P2.px, AtaqueP2.px, AtaqueP2.py, 17,13);
+          P1.vida -= AtaqueP2.damage;
+          //FillRect(172,10,(100-P1.vida),20,0x763e); //****
+          FillRect(45 + P1.vida,10,100-P1.vida,20,0x763e);
+          if (P1.vida == 0){
+            pantallas = 0;
+            GAME_OVER(2);
+          }
+        }
+        break;
+      case 2:
+        if( !(((AtaqueP2.px+52)>=P1.px) && (AtaqueP2.px <= (P1.px+33)) && ((AtaqueP2.py+30) >= P1.py) && (AtaqueP2.py <= (P1.py+38))) ){
+          switch(P2.orientacion){
+            case 0:
+              AtaqueP2.px +=5;
+              break;
+            case 1:
+              AtaqueP2.px -=5;
+              break;
+          }
+          if( !(AtaqueP2.px > 267 ||  AtaqueP2.px <=15) ){ //agregar topa con ataque contrario
+            LCD_SD_Sprite(AtaqueP2.px, AtaqueP2.py,52,30,1,0,P2.orientacion,0, dir_ataqueB2[P2.seleccion]);
+          }
+          else{
+            AtaqueP2.zeit = millis();
+            switch(P2.orientacion){
+              case 0:
+                FillRect(P2.px+33,P1.py,(AtaqueP2.px + 52)-(P2.px+33),38,0x763e);
+                break;
+              case 1:
+                FillRect(AtaqueP2.px,P2.py,P2.px-AtaqueP2.px,38,0x763e);
+                break;
+            }
+          }
+        }
+        else{
+          AtaqueP2.tecnica = 0;
+          if (P1.vida > AtaqueP2.damage){
+            P1.vida -= AtaqueP2.damage;
+            //FillRect(172,10,(100-P2.vida),20,0x763e);  //*****
+            FillRect(45 + P1.vida,10,100-P1.vida,20,0x763e);
+          }
+          else{
+            P1.vida = 0;
+          }
+          AtaqueP2.zeit = millis();
+          switch(P2.orientacion){
+            case 0:
+              FillRect(P2.px+33,P2.py,(AtaqueP2.px + 52)-(P2.px+33),38,0x763e);
+              break;
+            case 1:
+              FillRect(AtaqueP2.px,P2.py,P2.px-AtaqueP2.px,38,0x763e);
+              break;
+          }
+          if(!P1.vida){
+            pantallas = 0;
+            GAME_OVER(2);
+          }
+        }
+    }
   }
 
   
@@ -378,60 +526,104 @@ void loop() {
     }
   }
   
-    if (digitalRead(PUSH_A) == 0){
-      P1.pos_spr = 3;
-      if (P1.ki >= 10 && !AtaqueP1.zeit ){
-        if(AtaqueP1.tecnica == 0){
-            ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
-            AtaqueP1.py = P1.py + 13;
-            AtaqueP1.damage = 5;
-            AtaqueP1.spr = 0;
-            AtaqueP1.gasto = 10;
-            P1.ki -= 10;
-            FillRect(46+P1.ki,32,100-P1.ki,10,0x763e);
-            switch(P1.orientacion){
-              case 0:
-                AtaqueP1.px = P1.px + 35;
+  if (digitalRead(PUSH_A) == 0){
+    P1.pos_spr = 3;
+    if (P1.ki >= 10 && !AtaqueP1.zeit ){
+      if(AtaqueP1.tecnica == 0){
+         // ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
+          AtaqueP1.py = P1.py + 13;
+          AtaqueP1.damage = 5;
+          AtaqueP1.spr = 0;
+          AtaqueP1.gasto = 10;
+          P1.ki -= AtaqueP1.gasto;
+          FillRect(46+P1.ki,32,100-P1.ki,10,0x763e);
+          switch(P1.orientacion){
+            case 0:
+              AtaqueP1.px = P1.px + 35;
+              LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,dir_ataqueA[P1.seleccion]);
+              AtaqueP1.px +=17;
+              AtaqueP1.tecnica = 1;
+              AtaqueP1.spr = 1;
+              break;
+            case 1:
+              if(P1.px<40){
+                AtaqueP1.tecnica = 0;
+                AtaqueP1.zeit = millis();
+              }
+              else{
+                AtaqueP1.px = P1.px - 17;
                 LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,dir_ataqueA[P1.seleccion]);
-                AtaqueP1.px +=17;
+                AtaqueP1.px -=17;
                 AtaqueP1.tecnica = 1;
                 AtaqueP1.spr = 1;
-                break;
-              case 1:
-                if(P1.px<35){
-                  AtaqueP1.tecnica = 0;
-                  AtaqueP1.zeit = millis();
-                }
-                else{
-                  AtaqueP1.px = P1.px - 17;
-                  LCD_SD_Sprite(AtaqueP1.px,AtaqueP1.py,17,13,2,AtaqueP1.spr,P1.orientacion,0,dir_ataqueA[P1.seleccion]);
-                  AtaqueP1.px -=17;
-                  AtaqueP1.tecnica = 1;
-                  AtaqueP1.spr = 1;
-                }
-                
-                break;
-            }
-        }
-       }
-     }
-     else{
-      if(AtaqueP1.spr == 1 && AtaqueP1.tecnica == 1){
-        AtaqueP1.zeit = ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
-        AtaqueP1.tecnica = 0;
+              }
+              
+              break;
+          }
       }
      }
+   }
+   else{
+    if(AtaqueP1.spr == 1 && AtaqueP1.tecnica == 1){
+      AtaqueP1.zeit = ATK_limpiar(P1.orientacion, P1.px, AtaqueP1.px, AtaqueP1.py, 17,13);
+      AtaqueP1.tecnica = 0;
+    }
+   }
 
    if (digitalRead(PUSH_B) == 0 && digitalRead(PUSH_DOWN)){
     P1.pos_spr = 4;
-    //P1.vida --;
-    //(45 + P1.vida,10,100-P1.vida,20,0x763e);
-    if (P1.vida == 0){
-      pantallas = 0;
+    if (P1.ki >= 80 && !AtaqueP1.zeit ){
+      if(!AtaqueP1.tecnica){
+        //limpiar
+        AtaqueP1.py = P1.py;
+        AtaqueP1.damage = 30;
+        AtaqueP1.gasto = 80;
+        P1.ki -= AtaqueP1.gasto;  
+        FillRect(46+P1.ki,32,100-P1.ki,10,0x763e);
+        switch(P1.orientacion){
+          case 0:
+            AtaqueP1.px = P1.px + 35;
+            LCD_SD_Sprite(AtaqueP1.px, AtaqueP1.py,12,38,1,0,P1.orientacion,0, dir_ataqueB1[P1.seleccion]);
+            AtaqueP1.px +=12;
+            AtaqueP1.py +=4;
+            LCD_SD_Sprite(AtaqueP1.px, AtaqueP1.py,52,30,1,0,P1.orientacion,0, dir_ataqueB2[P1.seleccion]);
+            AtaqueP1.tecnica = 2;
+            break;
+          case 1:
+            if(P1.px<45){
+              AtaqueP1.tecnica =0;
+              AtaqueP1.zeit = millis();
+            }
+            else{
+              AtaqueP1.px = P1.px - 12;
+              LCD_SD_Sprite(AtaqueP1.px, AtaqueP1.py,12,38 ,1,0,P1.orientacion,0, dir_ataqueB1[P1.seleccion]);
+              AtaqueP1.px -=52;
+              AtaqueP1.py +=4;
+              LCD_SD_Sprite(AtaqueP1.px, AtaqueP1.py,52,30,1,0,P1.orientacion,0, dir_ataqueB2[P1.seleccion]);
+              AtaqueP1.tecnica = 2;
+            }
+            break;
+        }
+      }
+    }
+  }
+  else{
+    if(AtaqueP1.tecnica == 2){
+      AtaqueP1.zeit = millis();
+      AtaqueP1.tecnica = 0;
+      switch(P1.orientacion){
+        case 0:
+          FillRect(P1.px+33,P1.py,(AtaqueP1.px + 52)-(P1.px+33),38,0x763e);
+          break;
+        case 1:
+          FillRect(AtaqueP1.px,P1.py,P1.px-AtaqueP1.px,38,0x763e);
+          break;
+      }
     }
   }
 
   if( !digitalRead(PUSH_B) && !digitalRead(PUSH_DOWN)){
+    AtaqueP1.zeit = millis();
     P1.pos_spr = 2;
     if(P1.ki <101){
       P1.ki ++;
@@ -453,6 +645,174 @@ void loop() {
      AtaqueP1.tecnica = 0;
     }
 
+// Controles JUGADOR 2
+
+  if (digitalRead(PUSH2_RIGHT) == 0 && !AtaqueP2.tecnica){
+    P2.orientacion = 0;
+    P2.pos_spr = 1;
+    if( !(((P2.px+33)>=P1.px) && (P2.px<(P1.px+33)) && (P2.py<(P1.py+38)) && ((P2.py+38)>P1.py))){
+      P2.px +=1;
+      if (P2.px > 285){
+        P2.px = 285;
+      }
+    }
+  }
+
+  if (digitalRead(PUSH2_LEFT) == 0 && !AtaqueP2.tecnica){
+    P2.orientacion = 1;
+    P2.pos_spr = 1;
+    if( !((P2.px<=(P1.px+33)) && (P2.px>=P1.px) && (P2.py<(P1.py+38)) && ((P2.py+38)>P1.py) ) ){
+      P2.px --;
+      if(P2.px < 2){
+        P2.px = 2;
+      }
+    }
+  }
+  
+   if (digitalRead(PUSH2_DOWN) == 0 && digitalRead(PUSH2_B) && !AtaqueP2.tecnica ){
+    if (P2.py != 179){
+      P2.pos_spr = 1;
+    }
+    else{
+      P2.pos_spr = 0;
+    }
+    if( !(((P2.py+38)>=P1.py) && (P2.py<(P1.py)) && ((P2.px+33)>P1.px) && (P2.px<(P1.px+33)) )){
+      P2.py ++;
+      if (P2.py > 179){
+        P2.py = 179;
+      }
+    }
+  }
+  
+  if (digitalRead(PUSH2_UP) == 0 && !AtaqueP2.tecnica) {
+    P2.pos_spr = 1;
+    if( !((P2.py<=(P1.py+38)) && (P2.py>P1.py) && ((P2.px+33)>P1.px) && (P2.px<(P1.px+33))) ){
+      P2.py --;
+      if (P2.py < 65){
+        P2.py = 65;
+      }
+    }
+  }
+  
+  if (digitalRead(PUSH2_A) == 0){
+    P2.pos_spr = 3;
+    if (P2.ki >= 10 && !AtaqueP2.zeit ){
+      if(AtaqueP2.tecnica == 0){
+          //ATK_limpiar(P2.orientacion, P2.px, AtaqueP2.px, AtaqueP2.py, 17,13);
+          AtaqueP2.py = P2.py + 13;
+          AtaqueP2.damage = 5;
+          AtaqueP2.spr = 0;
+          AtaqueP2.gasto = 10;
+          P2.ki -= AtaqueP2.gasto;
+          FillRect(271-P2.ki-AtaqueP2.gasto,32,AtaqueP2.gasto,10,0x763e); //*******
+          switch(P2.orientacion){
+            case 0:
+              AtaqueP2.px = P2.px + 35;
+              LCD_SD_Sprite(AtaqueP2.px,AtaqueP2.py,17,13,2,AtaqueP2.spr,P2.orientacion,0,dir_ataqueA[P2.seleccion]);
+              AtaqueP2.px +=17;
+              AtaqueP2.tecnica = 1;
+              AtaqueP2.spr = 1;
+              break;
+            case 1:
+              if(P2.px<40){
+                AtaqueP2.tecnica = 0;
+                AtaqueP2.zeit = millis();
+              }
+              else{
+                AtaqueP2.px = P2.px - 17;
+                LCD_SD_Sprite(AtaqueP2.px,AtaqueP2.py,17,13,2,AtaqueP2.spr,P2.orientacion,0,dir_ataqueA[P2.seleccion]);
+                AtaqueP2.px -=17;
+                AtaqueP2.tecnica = 1;
+                AtaqueP2.spr = 1;
+              }
+              
+              break;
+          }
+      }
+     }
+   }
+   else{
+    if(AtaqueP2.spr == 1 && AtaqueP2.tecnica == 1){
+      AtaqueP2.zeit = ATK_limpiar(P2.orientacion, P2.px, AtaqueP2.px, AtaqueP2.py, 17,13);
+      AtaqueP2.tecnica = 0;
+    }
+   }
+
+   if (digitalRead(PUSH2_B) == 0 && digitalRead(PUSH2_DOWN)){
+    P2.pos_spr = 4;
+    if (P2.ki >= 80 && !AtaqueP2.zeit ){
+      if(!AtaqueP2.tecnica){
+        //limpiar
+        AtaqueP2.py = P2.py;
+        AtaqueP2.damage = 30;
+        AtaqueP2.gasto = 80;
+        P2.ki -= AtaqueP2.gasto;  
+        FillRect(271-P2.ki-AtaqueP2.gasto,32,AtaqueP2.gasto,10,0x763e);  //*****
+        switch(P2.orientacion){
+          case 0:
+            AtaqueP2.px = P2.px + 35;
+            LCD_SD_Sprite(AtaqueP2.px, AtaqueP2.py,12,38,1,0,P2.orientacion,0, dir_ataqueB1[P2.seleccion]);
+            AtaqueP2.px +=12;
+            AtaqueP2.py +=4;
+            LCD_SD_Sprite(AtaqueP2.px, AtaqueP2.py,52,30,1,0,P2.orientacion,0, dir_ataqueB2[P2.seleccion]);
+            AtaqueP2.tecnica = 2;
+            break;
+          case 1:
+            if(P2.px<45){
+              AtaqueP2.tecnica =0;
+              AtaqueP2.zeit = millis();
+            }
+            else{
+              AtaqueP2.px = P2.px - 12;
+              LCD_SD_Sprite(AtaqueP2.px, AtaqueP2.py,12,38 ,1,0,P2.orientacion,0, dir_ataqueB1[P2.seleccion]);
+              AtaqueP2.px -=52;
+              AtaqueP2.py +=4;
+              LCD_SD_Sprite(AtaqueP2.px, AtaqueP2.py,52,30,1,0,P2.orientacion,0, dir_ataqueB2[P2.seleccion]);
+              AtaqueP2.tecnica = 2;
+            }
+            break;
+        }
+      }
+    }
+  }
+  else{
+    if(AtaqueP2.tecnica == 2){
+      AtaqueP2.zeit = millis();
+      AtaqueP2.tecnica = 0;
+      switch(P2.orientacion){
+        case 0:
+          FillRect(P2.px+33,P2.py,(AtaqueP2.px + 52)-(P2.px+33),38,0x763e);
+          break;
+        case 1:
+          FillRect(AtaqueP2.px,P2.py,P2.px-AtaqueP2.px,38,0x763e);
+          break;
+      }
+    }
+  }
+
+  if( !digitalRead(PUSH2_B) && !digitalRead(PUSH2_DOWN)){
+    AtaqueP2.zeit = millis();
+    P2.pos_spr = 2;
+    if(P2.ki <101){
+      P2.ki ++;
+      //FillRect(45,32,P1.ki,10,0x1A0B);
+      V_line(272-P2.ki,32,9, 0x1A0B);  //**************
+      //V_line(272,32,9,0xA8A3);
+    }
+    
+    
+  }
+
+    if (digitalRead(PUSH2_UP) == 1 &&
+        digitalRead(PUSH2_DOWN) == 1 &&
+        digitalRead(PUSH2_RIGHT) == 1 &&
+        digitalRead(PUSH2_LEFT) == 1 &&
+        digitalRead(PUSH2_A) == 1 &&
+        digitalRead(PUSH2_B) == 1){
+
+     P2.pos_spr = 0;    
+     AtaqueP2.tecnica = 0;
+    }
 
   
 
@@ -965,22 +1325,31 @@ void Per_avatar(uint8_t player_select,uint16_t x, uint8_t y, uint8_t ancho, uint
 //***************************************************************************************************************************************
 void reset_Estados(void){
   P1.py = 179;
-  P1.px = 100;
+  P1.px = 20;
   P1.pos_spr = 0;
   P1.orientacion = 0;
   P1.vida = 100;
   P1.ki = 50;
   P1.listo = 0;
   AtaqueP1.zeit = 0;
+  AtaqueP1.py = 100;
+  AtaqueP1.px = 100;
+  AtaqueP1.spr = 0;
+  AtaqueP1.tecnica = 0;
 
-  P2.py = 120;
-  P2.px = 3;
+  P2.py = 179;
+  P2.px = 266;
   P2.pos_spr = 0;
   P2.orientacion = 1;
   P2.vida = 100;
   P2.ki = 50;
   P2.listo = 0;
   AtaqueP2.zeit = 0;
+  AtaqueP2.py = 100;
+  AtaqueP2.px = 100;
+  AtaqueP2.spr = 0;
+  AtaqueP2.tecnica = 0;
+
 }
 
 //***************************************************************************************************************************************
@@ -999,4 +1368,26 @@ unsigned long ATK_limpiar(uint8_t orientacion, uint16_t x, uint16_t ATKx, uint8_
   }
   unsigned long tiempo = millis(); 
   return(tiempo); 
+}
+
+//***************************************************************************************************************************************
+// Función mostrar fina de pelea
+//***************************************************************************************************************************************
+void GAME_OVER(uint8_t ganador){
+  LCD_Bitmap(125,100,69,44,KO);
+  switch(ganador){
+    case 1:
+    {
+      String gana1 = "P1 GANA!";
+      LCD_Print(gana1, 95,75,2,0xFFFF,0xA8A3);
+    }
+      break;
+    case 2:
+    {
+      String gana2 = "P2 GANA!";
+      LCD_Print(gana2, 95,75,2,0xFFFF,0x1A0B);
+    }
+      break;
+  }
+  delay(4000);
 }
