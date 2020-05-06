@@ -31,6 +31,9 @@
 #include "font.h"
 #include "lcd_registers.h"
 
+#define SDA  PA_7
+#define SCL  PA_6
+
 /* Botones para el Jugador 1*/
 #define PUSH_UP PE_2
 #define PUSH_LEFT PE_3
@@ -138,6 +141,9 @@ void setup() {
   pinMode(PUSH2_LEFT, INPUT_PULLUP);
   pinMode(PUSH2_RIGHT, INPUT_PULLUP);
   pinMode(PUSH2_DOWN, INPUT_PULLUP);
+
+  pinMode(SDA, OUTPUT);
+  pinMode(SCL, OUTPUT);
   
   SysCtlClockSet(SYSCTL_SYSDIV_2_5|SYSCTL_USE_PLL|SYSCTL_OSC_MAIN|SYSCTL_XTAL_16MHZ);
   Serial.begin(9600);
@@ -154,8 +160,11 @@ void setup() {
   }
   //Serial.println("initialization done.");
 
-  //LCD_Bitmap(0,0,320,240,cricosoNuevo);
-  //delay(4000);
+  digitalWrite(SCL, HIGH);
+  digitalWrite(SDA, LOW);
+  
+  LCD_Bitmap(0,0,320,240,cricosoNuevo);
+  delay(3000);
 
   
 }
@@ -164,6 +173,8 @@ void setup() {
 //***************************************************************************************************************************************
 void loop() {
   if (pantallas == 0){
+    digitalWrite(SCL, HIGH);
+    digitalWrite(SDA, LOW);
     LCD_Clear(0xAA23);
     Per_avatar(P1.seleccion,70,100,40,56);
     String jug1 = " P1 ";
@@ -275,6 +286,9 @@ void loop() {
       FillRect(45,32,P1.ki,10,0x1A0B);
       FillRect(172+P2.ki,32,P2.ki,10,0x1A0B);
 
+      digitalWrite(SCL, LOW);
+      digitalWrite(SDA, HIGH);
+      
 //      LCD_Bitmap(125,100,69,44,KO);
 //      String gana1 = "P1 WINS!";
 //      LCD_Print(gana1, 95,75,2,0xFFFF,0xA8A3);
@@ -284,7 +298,7 @@ void loop() {
   /* *****************************************************************************************
    *                                         Pelea
    *******************************************************************************************/
-
+  
   unsigned long currentMillis = millis();
   if( (currentMillis-AtaqueP1.zeit) >= 500){
     AtaqueP1.zeit = 0;
@@ -372,6 +386,7 @@ void loop() {
           }
           else{
             P2.vida = 0;
+            FillRect(172,10,(100-P2.vida),20,0x763e);
           }
           AtaqueP1.zeit = millis();
           switch(P1.orientacion){
@@ -459,6 +474,7 @@ void loop() {
           }
           else{
             P1.vida = 0;
+            FillRect(45 + P1.vida,10,100-P1.vida,20,0x763e);
           }
           AtaqueP2.zeit = millis();
           switch(P2.orientacion){
@@ -1379,7 +1395,7 @@ void GAME_OVER(uint8_t ganador){
     case 1:
     {
       String gana1 = "P1 GANA!";
-      LCD_Print(gana1, 95,75,2,0xFFFF,0xA8A3);
+      LCD_Print(gana1, 95 ,75,2,0xFFFF,0xA8A3);
     }
       break;
     case 2:
