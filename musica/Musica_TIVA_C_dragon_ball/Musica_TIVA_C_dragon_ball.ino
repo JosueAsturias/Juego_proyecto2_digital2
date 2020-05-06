@@ -7,13 +7,14 @@
  * Proyecto 2 - música Dragon Ball Z
  */
 
-#include <Wire.h>
+//#include <Wire.h>
 
   // put your setup code here, to run once:
-int btn = PUSH1;   
-int btn2 = PUSH2;  
+int SDA = PA_7;   
+int SCL = PA_6;  
+int btn3 = PD_7;
 int pinSound = PC_4;   
-
+int altaveu = PB_3;
 int notaActual = 0;
 
 int  DO=523.25, //definimos las frecuencias de las notas
@@ -35,7 +36,7 @@ int  DO=523.25, //definimos las frecuencias de las notas
         MI2=1318.51,
         PAU=30000; //pausa
 
-int d1=1125,d=1000, e=750, m=500, c=250, o=125; //definimos los tiempos de doble, entera, media y cuarta
+int d1=900,d=850, e=650, m=450, c=200, o=100; //definimos los tiempos de doble, entera, media y cuarta
 
 int melodia[] ={
 698,698,622,523,698,698,698,622,523,698,
@@ -84,21 +85,40 @@ m,c,c,c,o,c,c,d,c,
 m,o,o,o,c,c,c,c,c,m,c,e
 };
 
-int x;    //variable de recibir en i2c
+int melodia2[] = {
+1432,1275,1432,1136,1432,1014,1432,1275,1432,1432,
+1136,1275,1432,1519,1432,1275,1136,1014,1136,1136,
+956,1014,1136,1275,1136,1014,956,892,836,836,
+956,1519,1432,956,1014,1136,1275,1136,1014,956,
+1014,1014,956,892,956
+};
+
+int duracionNota2[] = {
+125,125,125,125,125,125,125,125,250,250,
+125,125,125,125,250,250,250,250,250,250,
+125,125,125,125,250,250,250,250,125,125,
+250,250,500,250,125,125,250,250,250,125,
+125,500,250,250,500
+};
+
+
+//int x;    //variable de recibir en i2c
 
 void setup() {
-  Wire.begin(20);                // join i2c bus with address #20
-  Wire.onReceive(receiveEvent); // register event
+  //Wire.begin(20);                // join i2c bus with address #20
+  //Wire.onReceive(receiveEvent); // register event
   Serial.begin(9600);           // start serial for output
   pinMode (pinSound,OUTPUT); // PIN DEL BUZZER O ALTOPARLANTE
-  pinMode (btn, INPUT_PULLUP); // BOTON PARA INICIAR LAS CANCIONES 
-  pinMode (btn2, INPUT_PULLUP);
+  pinMode (SDA, INPUT); // BOTON PARA INICIAR LAS CANCIONES 
+  pinMode (SCL, INPUT);
+  pinMode (btn3, INPUT);
+  pinMode (altaveu,OUTPUT); // PIN DEL BUZZER O ALTOPARLANTE
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   notaActual = 0;
-  while(digitalRead(btn)==LOW)
+  while((digitalRead(SCL)==0) && (digitalRead(SDA)==1))
    { 
     tone(pinSound, melodia[notaActual]); //da el tono a la frecuencia de la nota en ese momento
     delay(duracionNota[notaActual]);//se mantiene con la nota el tiempo definido para esa nota
@@ -108,26 +128,38 @@ void loop() {
       notaActual = 0;
     }
    }
+    notaActual = 0;
+    while((digitalRead(SCL)==1) && (digitalRead(SDA)==1 ))
+   { 
+    tone(pinSound, melodia2[notaActual]); //da el tono a la frecuencia de la nota en ese momento
+    delay(duracionNota2[notaActual]);//se mantiene con la nota el tiempo definido para esa nota
+    noTone(pinSound); //finaliza la melodía
+    notaActual++;
+    if (notaActual ==44){
+      notaActual = 0;
+    }
+   }
+
    
   notaActual = 0;
-  while(digitalRead(btn2)==LOW
-  )
+  while((digitalRead(SCL)==1) && (digitalRead(SDA)==0))
    {    
     tone(pinSound, melodia3[notaActual]); //da el tono a la frecuencia de la nota en ese momento
     delay(duracionNota3[notaActual]);//se mantiene con la nota el tiempo definido para esa nota
     noTone(pinSound); //finaliza la melodía
     notaActual++;
-    if (notaActual ==88){
+    if (notaActual ==84){
       notaActual = 0;
     }
     }
 }
 
-void receiveEvent(int howMany) {
+
+/*void receiveEvent(int howMany) {
   while (1 < Wire.available()) { // loop through all but the last
     char c = Wire.read(); // receive byte as a character
     Serial.print(c);         // print the character
   }
   x = Wire.read();    // receive byte as an integer
   Serial.println(x);         // print the integer
-}
+}*/
